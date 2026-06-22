@@ -7,8 +7,8 @@ Update this file after every completed feature. Any AI agent reading this should
 ## Current Status
 
 **Phase:** Phase 1 — Foundation
-**Last completed:** 01 Homepage
-**Next:** 02 Auth
+**Last completed:** 02 Auth
+**Next:** 03 PostHog Initialization
 
 ---
 
@@ -17,7 +17,7 @@ Update this file after every completed feature. Any AI agent reading this should
 ### Phase 1 — Foundation
 
 - [x] 01 Homepage
-- [ ] 02 Auth
+- [x] 02 Auth
 - [ ] 03 PostHog Initialization
 - [ ] 04 Database Schema
 
@@ -50,7 +50,10 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Decisions Made During Build
 
-_Add decisions here as they are made during implementation._
+- **Auth package**: Use `@insforge/sdk/ssr` — NOT `@insforge/ssr` (that package doesn't exist on npm). All SSR helpers (`createBrowserClient`, `createServerClient`, `updateSession`, `createRefreshAuthRouter`, `createAuthActions`) are exported from `@insforge/sdk/ssr`.
+- **OAuth callback**: Client sends `code` + PKCE verifier (from `sessionStorage["insforge_pkce_verifier"]`) to a Server Action (`exchangeOAuthCode`), which calls `createAuthActions({ cookies }).exchangeOAuthCode()`. This sets refresh token cookies on the app domain, not InsForge domain.
+- **Token refresh route**: `createRefreshAuthRouter()` creates the `POST` handler at `app/api/auth/refresh/route.ts`. `createBrowserClient()` calls this automatically when access token expires.
+- **Proxy (not Middleware)**: Next.js 16 renamed `middleware.ts` → `proxy.ts` and `export function middleware` → `export function proxy`. Functionality is identical. `updateSession()` from `@insforge/sdk/ssr/middleware` handles session check + silent refresh inline. Returns `{ session }` — redirect to `/login` when `session` is null.
 
 ---
 
