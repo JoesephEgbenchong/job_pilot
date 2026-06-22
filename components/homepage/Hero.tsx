@@ -6,7 +6,7 @@ export function Hero() {
     <section className="bg-surface py-20 px-6">
       <div className="max-w-360 mx-auto ">
         <div className="relative text-center max-w-2xl mx-auto">
-          <div className="absolute -inset-x-[48rem] -top-16 -bottom-8 pointer-events-none bg-[radial-gradient(ellipse_70%_90%_at_50%_40%,var(--color-accent-light)_0%,var(--color-info-lightest)_50%,transparent_75%)]" />
+          <div className="absolute -inset-x-192 -top-16 -bottom-8 pointer-events-none bg-[radial-gradient(ellipse_70%_90%_at_50%_40%,var(--color-accent-light)_0%,var(--color-info-lightest)_50%,transparent_75%)]" />
           <div className="relative">
             <h1 className="text-5xl font-bold text-text-primary leading-[1.15]">
               Job hunting is hard.

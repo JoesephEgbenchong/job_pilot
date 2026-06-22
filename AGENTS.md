@@ -37,3 +37,51 @@ Read in this exact order before any implementation:
 - `/recover` — when something breaks after one failed correction.
 - `/remember save` — when a feature spans multiple sessions.
 - `/remember restore` — when returning after a multi-session feature.
+
+---
+
+## InsForge SDK Documentation - Overview
+
+> Added by InsForge MCP installer. Project uses Tailwind CSS v4 — ignore the note below about v3.4.
+
+### What is InsForge?
+
+Backend-as-a-service (BaaS) platform providing:
+
+- **Database**: PostgreSQL with PostgREST API
+- **Authentication**: Email/password + OAuth (Google, GitHub)
+- **Storage**: File upload/download
+- **AI**: OpenRouter key provisioning and model catalog for direct OpenAI-compatible integrations
+- **Functions**: Serverless function deployment
+- **Realtime**: WebSocket pub/sub (database + client events)
+
+### Getting Detailed Documentation
+
+**CRITICAL: Always call `fetch-docs` or `fetch-sdk-docs` MCP tool before writing any InsForge integration code.**
+
+Available `fetch-docs` types:
+
+- `"instructions"` — Essential backend setup (START HERE)
+- `"real-time"` — Real-time pub/sub via WebSockets
+- `"db-sdk-typescript"` — Database operations with TypeScript SDK
+- `"auth-sdk-typescript"` — TypeScript SDK methods for custom auth flows
+- `"auth-components-nextjs"` — Pre-built auth UI for Next.js (SSR)
+- `"storage-sdk"` — File storage operations
+- `"functions-sdk"` — Serverless functions invocation
+- `"ai-integration-sdk"` — AI integration with OpenRouter key
+- `"deployment"` — Deploy frontend via MCP tool
+- `"payments"` — Stripe Checkout, Billing Portal, webhooks
+
+### When to Use SDK vs MCP Tools
+
+**SDK (application logic):** auth, database CRUD, storage, AI, functions, payments checkout
+
+**MCP tools (infrastructure):** schema management (`run-raw-sql`, `get-table-schema`), bucket creation, function deployment, frontend deployment, backend metadata
+
+### SDK Notes
+
+- SDK returns `{data, error}` for all operations
+- Database inserts require array format: `[{...}]`
+- Serverless functions have one endpoint, no nested route paths
+- Storage: upload files to buckets, store URLs in database
+- AI: call OpenRouter directly with `baseURL: "https://openrouter.ai/api/v1"` and server-side `OPENROUTER_API_KEY`
