@@ -22,17 +22,26 @@ export default function CallbackPage() {
       }
 
       const codeVerifier = sessionStorage.getItem("insforge_pkce_verifier") ?? "";
-
-      const { error } = await exchangeOAuthCode(code, codeVerifier);
-
-      if (error) {
-        console.error("OAuth exchange failed:", error);
-        router.replace("/login?error=auth_failed");
-        return;
-      }
-
       sessionStorage.removeItem("insforge_pkce_verifier");
-      router.replace("/dashboard");
+
+      try {
+        const { error } = await exchangeOAuthCode(code, codeVerifier);
+
+        if (error) {
+          console.error("OAuth exchange failed:", error);
+          router.replace("/login?error=auth_failed");
+          return;
+        }
+
+        const next = sessionStorage.getItem("insforge_post_login_redirect") ?? "";
+        sessionStorage.removeItem("insforge_post_login_redirect");
+        // only follow relative paths to prevent open redirect
+        const destination = next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+        router.replace(destination);
+      } catch (err) {
+        console.error("OAuth callback threw:", err);
+        router.replace("/login?error=auth_failed");
+      }
     }
 
     handleCallback();
