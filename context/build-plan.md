@@ -88,6 +88,7 @@ Build the complete profile page UI with mock data. No save logic yet.
 **UI:**
 
 - Profile needs attention banner at top — completion percentage ring, missing field tags highlighted (e.g. PHONE, LOCATION, EDUCATION)
+- Connected Accounts section - LinkedIn row with "Not Connected" status and Connect LinkedIn button
 - Resume section — drag and drop upload area, "Click to upload or drag and drop" text, PDF only note, Select Resume button, Generate Resume from Profile button below
 - Profile Information form with clearly labeled sections:
   - Personal Info — Full Name, Email (pre-filled, not editable), Phone Number, Location, LinkedIn URL, Portfolio/GitHub, Work Authorization dropdown

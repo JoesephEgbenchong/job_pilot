@@ -7,8 +7,8 @@ Update this file after every completed feature. Any AI agent reading this should
 ## Current Status
 
 **Phase:** Phase 2 — Profile Page
-**Last completed:** 04 Database Schema
-**Next:** 05 Profile Page — Full UI
+**Last completed:** 05 Profile Page — Full UI
+**Next:** 06 Profile Save Logic
 
 ---
 
@@ -23,7 +23,7 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ### Phase 2 — Profile Page
 
-- [ ] 05 Profile Page — Full UI
+- [x] 05 Profile Page — Full UI
 - [ ] 06 Profile Save Logic
 - [ ] 07 AI Profile Extraction from Resume
 - [ ] 08 Resume PDF Generation from Profile
@@ -59,6 +59,10 @@ Update this file after every completed feature. Any AI agent reading this should
 - **`profiles.resume_key` added**: Not in the original architecture.md spec. The real storage SDK's `upload()`/`uploadAuto()` return `{key, url}`, and `download()`/`remove()` require the key — without storing it, Features 06/08 can't replace or delete the old resume file.
 - **Real InsForge DB SDK is namespaced under `.database`**: `insforge.database.from(...)`, not `insforge.from(...)`. `library-docs.md` was corrected — it previously showed the call without the `.database` namespace.
 - **Real storage SDK has no `upsert` or `getPublicUrl()`**: `upload()` auto-renames on key collision; there is no overwrite flag. `getPublicUrl()` doesn't exist — files are accessed via `download()` using the stored `key`. `library-docs.md` was corrected to match.
+- **`profile.png` overrides `build-plan.md` §05 where they conflict**: the design image was designated the literal source of truth for Feature 05. Two things `build-plan.md` specs are absent from the image and were intentionally omitted — the "Connected Accounts" (LinkedIn) section, and a Cover Letter Tone dropdown under Job Preferences (the `cover_letter_tone` DB column still exists on the `Profile` type, just no form control yet). Both can be added later as their own scoped feature if actually needed. If future context files reintroduce these, reconcile against the image first.
+- **Profile completion score is a fixed 10-field checklist** (`lib/utils.ts` `calculateProfileCompletion`) — full name, phone, location, job title, experience level, years of experience, skills, work experience, education (institution + grad year), job titles seeking. Email is excluded (auto-filled from auth, never missing); LinkedIn/portfolio/work authorization/remote preference are excluded as enhancer-only fields not flagged by the design's banner. This exact 10-field set was reverse-engineered to reproduce `profile.png`'s 70%/PHONE+LOCATION+EDUCATION state precisely — Feature 06 should reuse this function rather than re-deriving the logic.
+- **Profile completion is computed once, not live**: `app/profile/page.tsx` computes percentage/missing fields from the initial mock data server-side; `ProfileForm`'s live edits (client state) don't recompute the banner. Revisit if Feature 06 wants a live-updating banner.
+- **`ResumePreview.tsx`** (listed in `architecture.md`'s file registry) was deferred — `profile.png` only shows the empty dropzone state, never a "resume already on file" preview, so there's no design to build it against yet. Selected-file display lives inline inside `ResumeUpload.tsx` instead.
 
 ---
 

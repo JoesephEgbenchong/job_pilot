@@ -77,6 +77,75 @@ After building any component — update this file with the component name, file 
 
 ### Placeholder Pages (Auth-protected)
 
-**Files:** `app/dashboard/page.tsx`, `app/profile/page.tsx`, `app/find-jobs/page.tsx`
+**Files:** `app/dashboard/page.tsx`, `app/find-jobs/page.tsx`
 **Classes:** `min-h-screen bg-background flex flex-col items-center justify-center gap-6` (page), `text-3xl font-bold text-text-primary` (h1), `text-text-secondary text-sm` (subtitle).
-**Notes:** Server Components. Each imports `SignOutButton`. Stubs to be replaced in later features (14, 05, 09 respectively).
+**Notes:** Server Components. Each imports `SignOutButton`. Stubs to be replaced in later features (14, 09 respectively). `app/profile/page.tsx` replaced in Feature 05 — see below.
+
+### Profile Page
+
+**File:** `app/profile/page.tsx`
+**Classes:** `min-h-screen bg-background` (page), `max-w-4xl mx-auto px-8 py-8 flex flex-col gap-6` (main content column — narrower than the 1440px page invariant since this is a single-column form, matching `profile.png`'s proportions).
+**Notes:** Server Component. Renders `Navbar`, then `CompletionIndicator`, `ResumeUpload`, `ProfileForm` in a vertical stack. Mock `Profile` object (matching `profile.png`'s values exactly, including intentionally-empty phone/location/institution/graduation_year to reproduce the 70% completion state) is defined here and passed down. `calculateProfileCompletion()` (in `lib/utils.ts`) runs once against the initial mock object — not recomputed live as the user edits, since the design shows one static banner state per page load; Feature 06 will decide whether to make it live.
+**Scope note:** `build-plan.md` §05 also specs a "Connected Accounts" (LinkedIn) section — omitted here because it does not appear in `profile.png`, which was designated the literal source of truth for this feature. Similarly, `cover_letter_tone` exists on the `Profile` type (matches `architecture.md`'s DB schema) but has no form control in this UI — not shown in the design either. Both can be added later as their own scoped work if actually needed.
+
+### CompletionIndicator
+
+File: `components/profile/CompletionIndicator.tsx`
+Last updated: 2026-07-13
+
+| Property         | Class                                                             |
+| ---------------- | ------------------------------------------------------------------ |
+| Background       | `bg-surface`                                                      |
+| Border            | `border border-border`                                            |
+| Border radius     | `rounded-2xl` (card), `rounded-full` (missing-field pill)          |
+| Text — primary    | `text-text-primary` (percentage, heading)                         |
+| Text — secondary  | `text-text-secondary` (description)                               |
+| Spacing           | `p-6`, `gap-6` (card), `gap-2` (pill wrap), `mt-2`/`mt-3`          |
+| Hover state       | none — no interactive elements in this component                  |
+| Shadow            | `shadow`                                                          |
+| Accent usage      | none — this component is error-toned (incomplete-profile warning), not accent-toned |
+
+**Pattern notes:**
+Missing-field pills and the SVG progress ring both use `text-error`/`bg-error/10`/`stroke-error/15` (Tailwind opacity modifiers on the `--color-error` token) rather than a dedicated light/lightest error token. `ui-tokens.md` defines `-light`/`-lightest` variants for success/info/warning but not for error — flagging this as a gap worth adding to `ui-tokens.md` if another error-toned surface is needed later, so future components use a named token instead of an opacity modifier. Pure presentational — no `"use client"`; returns `null` when the profile is 100% complete.
+
+### ResumeUpload
+
+File: `components/profile/ResumeUpload.tsx`
+Last updated: 2026-07-13
+
+| Property         | Class                                                                                                    |
+| ---------------- | ----------------------------------------------------------------------------------------------------------- |
+| Background       | `bg-surface` (card), `bg-surface-secondary` (dropzone default), `bg-accent-muted` (dropzone dragging)         |
+| Border            | `border border-border` (card), `border-2 border-dashed border-border-muted` (dropzone default), `border-accent` (dropzone dragging) |
+| Border radius     | `rounded-2xl` (card), `rounded-xl` (dropzone), `rounded-md` (buttons), `rounded-full` (upload icon badge)     |
+| Text — primary    | `text-text-primary` (headline / filename)                                                                    |
+| Text — muted      | `text-text-muted` (helper copy)                                                                              |
+| Spacing           | `p-6` (card), `py-12` (dropzone), `px-4 py-2` (buttons), `gap-3` (dropzone stack)                             |
+| Hover state       | `hover:bg-surface-secondary` (secondary button), `hover:bg-surface-tertiary` (dropzone idle), `hover:bg-accent-dark` (primary button) |
+| Shadow            | `shadow` (card only — dropzone and buttons have none)                                                        |
+| Accent usage      | `bg-accent text-accent-foreground` (Generate Resume button), `border-accent`/`bg-accent-muted` (drag-active state), `text-accent` (upload icon) |
+
+**Pattern notes:**
+Client Component — `useState` for selected file + drag-over state only, nothing persists. `ResumePreview.tsx` (present in `architecture.md`'s file registry) was deferred: `profile.png` only shows the empty dropzone state, never an "existing resume" preview, so there's no design to build it against. Selected-file display was folded inline into this component instead. Build `ResumePreview.tsx` once a feature needs to render a persisted resume.
+
+### ProfileForm
+
+File: `components/profile/ProfileForm.tsx`
+Last updated: 2026-07-13
+
+| Property         | Class                                                                                                    |
+| ---------------- | ----------------------------------------------------------------------------------------------------------- |
+| Background       | `bg-surface` (card + inputs), `bg-surface-secondary` (disabled input, tag pill)                              |
+| Border            | `border border-border` (card, inputs, tag pill), `border-border` (role sub-card)                            |
+| Border radius     | `rounded-2xl` (outer card), `rounded-lg` (role sub-card), `rounded-md` (inputs/buttons), `rounded-full` (tag pill) |
+| Text — primary    | `text-text-primary` (input values, subsection headings)                                                      |
+| Text — secondary  | `text-text-secondary` (field labels — `uppercase text-xs tracking-wide`)                                     |
+| Text — muted      | `placeholder:text-text-muted`, `text-text-muted` (disabled input)                                            |
+| Spacing           | `p-6` (card), `px-3 py-2` (inputs), `gap-4` (field grids), `my-6` (section `hr`)                              |
+| Hover state       | `hover:bg-surface-secondary` (secondary/tag buttons), `hover:text-accent-dark` (Add role link), `hover:bg-accent-dark` (Save button) |
+| Focus state       | `focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent` — standard input focus pattern, apply to every future text/select input |
+| Shadow            | `shadow` (outer card only — role sub-cards use border only, no shadow, to avoid stacking two shadow levels) |
+| Accent usage      | focus ring (all inputs), Add role link, Save Profile button, `accent-accent` on the native checkbox         |
+
+**Pattern notes:**
+Single `useState<Profile>` seeded from the `initialProfile` prop; nothing persists (Feature 06 wires the save). Local unexported helpers `TextField`/`SelectField`/`Tag` live in the same file rather than separate files — mirrors the existing `GoogleIcon`/`GitHubIcon` pattern in `LoginCard.tsx` for small, non-reusable-elsewhere pieces. This establishes `inputClass`/`labelClass`/focus-ring pattern above as the canonical form-field look for the whole app — match it exactly for any future form (e.g. no separate input styling in Find Jobs' search controls). Known gotcha: `<input type="month">` renders in the browser/OS locale (e.g. "janvier 2022" seen in a French-locale test run) — native behavior, not a bug.
