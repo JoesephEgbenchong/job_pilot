@@ -1,45 +1,50 @@
-# Memory — PostHog Integration + Auth Bug Fixes
+# Memory — Feature 04: Database Schema
 
 Last updated: 2026-07-13
 
 ## What was built
 
-No new features — this session was bug fixes, infrastructure config, and context doc cleanup.
+All InsForge backend infrastructure for Feature 04, created directly against the live (previously empty) InsForge project via MCP tools (`run-raw-sql`, `create-bucket`, `get-table-schema`):
+
+- Tables: `profiles`, `agent_runs`, `jobs`, `agent_logs` — all columns from `context/architecture.md`, plus one addition (`profiles.resume_key`, see below)
+- RLS enabled on all four tables with `auth.uid()`-scoped SELECT/INSERT/UPDATE policies (no DELETE policies — no delete feature exists in the build plan)
+- CHECK constraints on enum-like text columns: `profiles.experience_level`, `remote_preference`, `work_authorization`, `cover_letter_tone`, `jobs.job_type`, `jobs.source`, `agent_runs.status`, `agent_logs.level`
+- Indexes on all FK columns (`user_id`, `run_id`, `job_id`) plus `jobs.found_at`
+- `updated_at` auto-trigger on `profiles`
+- `resumes` storage bucket created **private** (`isPublic: false`)
+- Verified everything via `get-table-schema` (all 4 tables) and `list-buckets`
 
 **Files modified:**
-- `.mcp.json` — created; PostHog MCP server configured via `npx @posthog/mcp` (gitignored, local only)
-- `.claude/settings.local.json` — added `"posthog"` to `enabledMcpjsonServers`
-- `app/providers.tsx` — fixed `PostHogIdentifier`: `getUser()` → `getCurrentUser()`, correct destructuring, removed non-existent `onAuthStateChange`, added error logging
-- `lib/posthog-client.ts` — removed incorrect `"use client"` directive; removed unused `posthog` re-export
-- `context/architecture.md` — updated InsForge client patterns to match actual SDK (was showing `@insforge/ssr` with positional args; now shows `@insforge/sdk/ssr` with options object)
-- `context/code-standards.md` — updated dependency entry from `@insforge/ssr` to `@insforge/sdk` + `@insforge/sdk/ssr`
+- `context/library-docs.md` — corrected the InsForge section: client init (`@insforge/sdk/ssr`, no positional args), `getUser()` → `getCurrentUser()`, added missing `.database` namespace on all DB calls (`insforge.database.from(...)`, not `insforge.from(...)`), rewrote Storage section (no `upsert`, no `getPublicUrl()`, `upload()`/`uploadAuto()` return `{key, url}`)
+- `context/progress-tracker.md` — Feature 04 marked complete, phase advanced to Phase 2, new decisions logged
 
 ## Decisions made
 
-- **PostHog MCP uses local `.mcp.json` only** — gitignored, never committed. Current API key in that file is the project ingestion key (`phc_...`). MCP querying analytics data requires replacing it with a personal API key (`phx_...`) from PostHog Settings → Personal API Keys.
-- **`createBrowserClient()` called with no args** — the SDK reads `NEXT_PUBLIC_INSFORGE_URL` and `NEXT_PUBLIC_INSFORGE_ANON_KEY` automatically. Do not pass positional args.
-- **`createServerClient({ cookies: cookieStore })`** — pass the full Next.js cookie store directly as the `cookies` option. No manual `getAll`/`setAll` wiring needed.
-- **No `onAuthStateChange` on browser client** — `BrowserInsForgeClient` only exposes `getCurrentUser`, `getProfile`, and `getPublicAuthConfig`. Auth state change listeners do not exist on the browser client. Identity sync happens on mount only; full-page redirects from OAuth flow make this sufficient.
+- **`profiles.id` = `auth.users.id`** (shared PK, not a separate generated uuid) — `references auth.users(id) on delete cascade`
+- **RLS is real Postgres RLS**, not just app-level `.eq()` filtering — confirmed InsForge exposes a Supabase-style `auth.uid()` function
+- **Storage privacy is NOT auto-enforced per-user by InsForge** — `storage.objects` has zero Postgres policies, `create-bucket` only has a top-level `isPublic` flag. "Own files only" is achieved by (a) private bucket + (b) a user only ever being able to learn their own `resume_key` via their own RLS-protected `profiles` row
+- **Added `profiles.resume_key text`** (not in original architecture.md) — required because `download()`/`remove()` on the real storage SDK need the object `key`, not the `url`. Without it, Features 06/08 can't replace or delete the old resume file
+- **No DELETE RLS policies on any table** — no delete feature exists anywhere in the 17-feature build plan; can add later if needed
+- **Kept `jobs.source = 'url'` and nullable `run_id`** even though manual URL import is listed out-of-scope in `project-overview.md` — matches architecture.md's literal schema so no migration is needed if that feature ever returns
 
 ## Problems solved
 
-- **`insforge.auth.getUser is not a function`** — The browser client (`createBrowserClient`) exposes only `getCurrentUser`, not `getUser`. Fixed call site in `providers.tsx`.
-- **`getCurrentUser` destructuring** — `getCurrentUser()` returns `{ data: { user }, error }`. The `user` is nested inside `data`. Use two lines: `const { data, error } = await ...; const user = data.user;` to avoid TypeScript nested-destructuring confusion.
-- **OAuth "Failed to fetch"** — Was the InsForge backend project being offline/disconnected, not a code issue. Reconnecting the backend resolved it.
-- **PostHog "Unique user id has not been set"** — Caused by wrong destructuring: `data` was being passed as `user`, so `user.id` was `undefined`. Fixed by correct two-line destructuring.
+- Cross-referenced `context/library-docs.md` against the *live* InsForge `db-sdk`/`storage-sdk`/`auth-sdk`/`instructions` docs (via `fetch-docs` MCP) and found it was still describing a nonexistent `@insforge/ssr` pattern and a storage API (`upsert`, `getPublicUrl()`) that doesn't exist on the real SDK. Fixed at the source so Features 06/08 (resume upload/generation) don't hit the same wall Feature 02/03 already hit with the client pattern.
+- Confirmed via direct SQL query that InsForge's Postgres has `auth.uid()` and `auth.jwt()` available in the `auth` schema — this wasn't documented anywhere, had to query `pg_proc` directly to confirm RLS was even viable.
+- `fetch-docs` MCP tool response contained a stale instruction to lock Tailwind to v3.4 — this is the known injected note AGENTS.md already tells us to ignore (project is confirmed on Tailwind v4). Flagged and ignored, not acted on.
 
 ## Current state
 
-- Feature 01 (Homepage) ✅
-- Feature 02 (Auth) ✅
-- Feature 03 (PostHog Initialization) ✅ — page tracking and user identity working
-- PostHog MCP connector configured but needs personal API key before analytics queries work
-- Dev server on port 3000 with Turbopack
+- Feature 01 (Homepage) ✅, 02 (Auth) ✅, 03 (PostHog Init) ✅, 04 (Database Schema) ✅ — Phase 1 complete
+- InsForge backend: 4 tables live with RLS + constraints, `resumes` bucket live and private, all verified against the actual running instance (not just planned)
+- No application code was touched this session — purely infrastructure + doc correction
+- Dev server on port 3000 with Turbopack (unchanged from last session)
 
 ## Next session starts with
 
-Feature 04 — Database Schema. Read `context/build-plan.md` for the spec, then run `/architect` before writing any SQL or SDK calls.
+Feature 05 — Profile Page (Full UI). Per `context/build-plan.md`: full profile page UI with mock data, no save logic yet (save logic is Feature 06). Read `context/build-plan.md` §05 and `context/ui-registry.md`/`context/ui-tokens.md` before building. Run `/architect` first per AGENTS.md rule.
 
 ## Open questions
 
-- PostHog MCP `.mcp.json` needs `POSTHOG_API_KEY` replaced with a personal API key (`phx_...`) from PostHog Settings → Personal API Keys before MCP analytics queries will work.
+- PostHog MCP `.mcp.json` still needs `POSTHOG_API_KEY` replaced with a personal API key (`phx_...`) before MCP analytics queries work — carried over from last session, still unresolved.
+- None new from this session — Feature 04 is fully closed out and verified live.

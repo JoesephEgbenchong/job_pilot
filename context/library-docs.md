@@ -36,35 +36,21 @@ Two separate instances — never mix them:
 
 ```typescript
 // lib/insforge-client.ts — browser context only
-import { createBrowserClient } from "@insforge/ssr";
+import { createBrowserClient } from "@insforge/sdk/ssr";
 
-export const insforge = createBrowserClient(
-  process.env.NEXT_PUBLIC_INSFORGE_URL!,
-  process.env.NEXT_PUBLIC_INSFORGE_ANON_KEY!,
-);
+export const insforge = createBrowserClient();
+// Reads NEXT_PUBLIC_INSFORGE_URL and NEXT_PUBLIC_INSFORGE_ANON_KEY automatically — no positional args
 ```
 
 ```typescript
 // lib/insforge-server.ts — server context only
-import { createServerClient } from "@insforge/ssr";
+import { createServerClient } from "@insforge/sdk/ssr";
 import { cookies } from "next/headers";
 
 export const createInsforgeServer = async () => {
   const cookieStore = await cookies();
-  return createServerClient(
-    process.env.NEXT_PUBLIC_INSFORGE_URL!,
-    process.env.NEXT_PUBLIC_INSFORGE_ANON_KEY!,
-    {
-      cookies: {
-        getAll: () => cookieStore.getAll(),
-        setAll: (cookiesToSet) => {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options),
-          );
-        },
-      },
-    },
-  );
+  return createServerClient({ cookies: cookieStore });
+  // Pass the cookie store directly as the `cookies` option — no manual getAll/setAll wiring
 };
 ```
 
@@ -74,6 +60,7 @@ export const createInsforgeServer = async () => {
 - Server client — Server Components, API routes, Server Actions, agent functions
 - Never use browser client in server context
 - Never use server client in browser context
+- `@insforge/ssr` does not exist as a package — always `@insforge/sdk` or `@insforge/sdk/ssr`
 
 ---
 
@@ -82,34 +69,37 @@ export const createInsforgeServer = async () => {
 ```typescript
 // Get current user in server context
 const insforge = await createInsforgeServer();
-const {
-  data: { user },
-  error,
-} = await insforge.auth.getUser();
+const { data, error } = await insforge.auth.getCurrentUser();
+const user = data.user;
 if (!user) redirect("/login");
 ```
+
+- Method is `getCurrentUser()`, not `getUser()`
+- `user` is nested inside `data` — destructure in two steps to avoid TypeScript confusion
+- The browser client only exposes `getCurrentUser`, `getProfile`, `getPublicAuthConfig` — no `onAuthStateChange` listener exists on it
 
 ---
 
 ### DB Queries
 
+Database operations are namespaced under `.database` — not called directly on the client.
+
 ```typescript
 // Read
-const { data, error } = await insforge
+const { data, error } = await insforge.database
   .from("jobs")
   .select("*")
   .eq("user_id", user.id)
   .order("found_at", { ascending: false });
 
-// Insert
-const { data, error } = await insforge
+// Insert — array format required
+const { data, error } = await insforge.database
   .from("jobs")
-  .insert({ user_id: user.id, title, company, match_score })
-  .select()
-  .single();
+  .insert([{ user_id: user.id, title, company, match_score }])
+  .select();
 
 // Update
-const { error } = await insforge
+const { error } = await insforge.database
   .from("jobs")
   .update({ company_research: dossier })
   .eq("id", jobId)
@@ -118,6 +108,8 @@ const { error } = await insforge
 
 **Rules:**
 
+- Always call through `insforge.database.from(...)` — not `insforge.from(...)`
+- `insert()` requires array format: `[{...}]`, even for a single row
 - Always scope queries to `user_id` — never query without user filter
 - Always handle the `error` return — never assume success
 - Use `.single()` when expecting exactly one row
@@ -127,20 +119,13 @@ const { error } = await insforge
 ### Storage
 
 ```typescript
-// Upload file
+// Upload file — no upsert option. Same key re-uploads get auto-renamed by the backend.
 const { data, error } = await insforge.storage
   .from("resumes")
-  .upload(`${userId}/resume.pdf`, fileBuffer, {
-    contentType: "application/pdf",
-    upsert: true, // overwrites existing file
-  });
+  .upload(`${userId}/resume.pdf`, fileBuffer);
 
-// Get public URL
-const { data } = insforge.storage
-  .from("resumes")
-  .getPublicUrl(`${userId}/resume.pdf`);
-
-const url = data.publicUrl;
+// data: { bucket, key, size, mimeType, uploadedAt, url }
+// Save BOTH data.url and data.key to the DB — download()/remove() need the key, not the url
 ```
 
 **Storage paths:**
@@ -149,8 +134,10 @@ const url = data.publicUrl;
 
 **Rules:**
 
-- Always use `upsert: true` for base resume uploads — overwrites existing file
-- Always save the public URL back to the DB after upload
+- There is no `upsert` option and no `getPublicUrl()` — those do not exist on the real SDK
+- To replace a resume: `remove()` the old `resume_key` (read from `profiles`) before/after uploading the new file, then save the new `key` and `url` to `profiles.resume_key` / `profiles.resume_pdf_url`
+- The `resumes` bucket is private (`isPublic: false`) — files are not fetchable by URL alone. Access goes through the SDK's `download()`, which requires the object `key`
+- "Own files only" is enforced by RLS on the `profiles` table, not by storage itself — a user can only ever learn their own `resume_key` by reading their own `profiles` row
 - Never write files to disk — always upload buffer directly to storage
 
 ---

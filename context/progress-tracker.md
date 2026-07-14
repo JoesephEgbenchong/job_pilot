@@ -6,9 +6,9 @@ Update this file after every completed feature. Any AI agent reading this should
 
 ## Current Status
 
-**Phase:** Phase 1 — Foundation
-**Last completed:** 03 PostHog Initialization
-**Next:** 04 Database Schema
+**Phase:** Phase 2 — Profile Page
+**Last completed:** 04 Database Schema
+**Next:** 05 Profile Page — Full UI
 
 ---
 
@@ -19,7 +19,7 @@ Update this file after every completed feature. Any AI agent reading this should
 - [x] 01 Homepage
 - [x] 02 Auth
 - [x] 03 PostHog Initialization
-- [ ] 04 Database Schema
+- [x] 04 Database Schema
 
 ### Phase 2 — Profile Page
 
@@ -54,6 +54,11 @@ Update this file after every completed feature. Any AI agent reading this should
 - **OAuth callback**: Client sends `code` + PKCE verifier (from `sessionStorage["insforge_pkce_verifier"]`) to a Server Action (`exchangeOAuthCode`), which calls `createAuthActions({ cookies }).exchangeOAuthCode()`. This sets refresh token cookies on the app domain, not InsForge domain.
 - **Token refresh route**: `createRefreshAuthRouter()` creates the `POST` handler at `app/api/auth/refresh/route.ts`. `createBrowserClient()` calls this automatically when access token expires.
 - **Proxy (not Middleware)**: Next.js 16 renamed `middleware.ts` → `proxy.ts` and `export function middleware` → `export function proxy`. Functionality is identical. `updateSession()` from `@insforge/sdk/ssr/middleware` handles session check + silent refresh inline. Returns `{ session }` — redirect to `/login` when `session` is null.
+- **RLS uses `auth.uid()`**: InsForge's Postgres exposes a Supabase-style `auth.uid()` function. All 4 tables (`profiles`, `agent_runs`, `jobs`, `agent_logs`) have RLS enabled with SELECT/INSERT/UPDATE policies scoped to `auth.uid() = user_id` (or `= id` for `profiles`, whose PK is the user's own `auth.users.id`). No DELETE policies — no delete feature exists in the build plan.
+- **Storage has no per-object RLS**: `storage.objects` has zero Postgres policies, and `create-bucket` only exposes a top-level `isPublic` flag. "Own files only" access for resumes is enforced by making the `resumes` bucket private and only ever exposing a user's `resume_key` through their own RLS-protected `profiles` row — not by the storage layer itself.
+- **`profiles.resume_key` added**: Not in the original architecture.md spec. The real storage SDK's `upload()`/`uploadAuto()` return `{key, url}`, and `download()`/`remove()` require the key — without storing it, Features 06/08 can't replace or delete the old resume file.
+- **Real InsForge DB SDK is namespaced under `.database`**: `insforge.database.from(...)`, not `insforge.from(...)`. `library-docs.md` was corrected — it previously showed the call without the `.database` namespace.
+- **Real storage SDK has no `upsert` or `getPublicUrl()`**: `upload()` auto-renames on key collision; there is no overwrite flag. `getPublicUrl()` doesn't exist — files are accessed via `download()` using the stored `key`. `library-docs.md` was corrected to match.
 
 ---
 
